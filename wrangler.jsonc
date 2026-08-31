@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "spring-truth-6550",
+  "compatibility_date": "2026-08-31",
+  "assets": {
+    "directory": ".",
+    "exclude": [
+      ".git",
+      "CNAME",
+      "LICENSE",
+      "wrangler.jsonc"
+    ]
+  }
+}
