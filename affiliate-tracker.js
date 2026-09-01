@@ -1,10 +1,17 @@
-/* Ndubiz Market Tech - outbound affiliate click reporting.
+/* Ndubiz Market Tech - outbound affiliate and cross-site click reporting.
    Records clicks only; it does not confirm purchases or commissions. */
 (function () {
   "use strict";
 
   const ENDPOINT = "https://formspree.io/f/xvkopppg";
   const SITE_NAME = "Ndubiz Market Tech";
+  const NDUBIZ_HOSTS = new Set([
+    "ndubizmarketcomstart.com",
+    "www.ndubizmarketcomstart.com",
+    "ndubizmarketechcomstart.com",
+    "www.ndubizmarketechcomstart.com",
+    "ndubiz.github.io"
+  ]);
   let lastClickKey = "";
   let lastClickAt = 0;
 
@@ -23,8 +30,10 @@
 
     const rel = (link.getAttribute("rel") || "").toLowerCase().split(/\s+/);
     const isMarkedAffiliate = rel.includes("sponsored") || link.dataset.affiliate === "true";
+    const isCrossSite = NDUBIZ_HOSTS.has(target.hostname) && target.origin !== window.location.origin;
     const isOutbound = target.protocol.startsWith("http") && target.origin !== window.location.origin;
-    return isMarkedAffiliate && isOutbound ? { link, target } : null;
+    if (!isOutbound || (!isMarkedAffiliate && !isCrossSite)) return null;
+    return { link, target, eventType: isMarkedAffiliate ? "affiliate_click" : "cross_site_click" };
   }
 
   function sourceName() {
@@ -39,7 +48,7 @@
     }
   }
 
-  function reportClick(link, target) {
+  function reportClick(link, target, eventType) {
     const product = (link.dataset.product || link.textContent || "Affiliate product")
       .replace(/\s+/g, " ").trim().slice(0, 120);
     const now = Date.now();
@@ -49,8 +58,8 @@
     lastClickAt = now;
 
     const payload = {
-      _subject: "Ndubiz affiliate click - " + product,
-      event_type: "affiliate_click",
+      _subject: "Ndubiz " + (eventType === "affiliate_click" ? "affiliate" : "cross-site") + " click - " + product,
+      event_type: eventType,
       website: SITE_NAME,
       product: product,
       destination: target.href,
@@ -79,6 +88,6 @@
 
   document.addEventListener("click", function (event) {
     const match = affiliateLinkFromEvent(event);
-    if (match) reportClick(match.link, match.target);
+    if (match) reportClick(match.link, match.target, match.eventType);
   }, true);
 })();
