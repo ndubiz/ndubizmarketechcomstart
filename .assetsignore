@@ -6,3 +6,5 @@ CNAME
 LICENSE
 src/
 wrangler.jsonc
+
+FEATURE-MAINTENANCE.md
