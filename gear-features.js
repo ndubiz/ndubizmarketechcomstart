@@ -3,7 +3,7 @@
  document.querySelectorAll('[data-gear-cards]').forEach(group => {
    group.addEventListener('toggle', event => {
      const card=event.target;
-     if(card.matches('details.gear-card') && card.open) group.querySelectorAll('details.gear-card[open]').forEach(other=>{if(other!==card)other.open=false;});
+     if(card.matches('details.gear-card') && card.open) document.querySelectorAll('details.gear-card[open]').forEach(other=>{if(other!==card)other.open=false;});
    },true);
  });
  document.querySelectorAll('[data-gear-quiz]').forEach(quiz => {
