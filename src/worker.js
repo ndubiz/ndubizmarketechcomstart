@@ -1,5 +1,6 @@
 const PRIMARY_HOST = "ndubizmarketcomstart.com";
 const LEGACY_HOSTS = new Set([
+  "www.ndubizmarketcomstart.com",
   "ndubizmarketechcomstart.com",
   "www.ndubizmarketechcomstart.com",
 ]);
