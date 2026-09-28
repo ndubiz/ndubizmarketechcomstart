@@ -87,7 +87,14 @@
   }
 
   document.addEventListener("click", function (event) {
+    // Respect the same visitor choice as Google Analytics; omit test journeys.
+    try {
+      if (localStorage.getItem('ndubiz-analytics-consent') !== 'accept') return;
+      if (sessionStorage.getItem('ndubiz-analytics-test') === '1') return;
+    } catch (_) { return; }
+    if (new URLSearchParams(location.search).get('utm_source') === 'codex_test') return;
     const match = affiliateLinkFromEvent(event);
     if (match) reportClick(match.link, match.target, match.eventType);
   }, true);
 })();
+

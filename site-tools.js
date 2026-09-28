@@ -3,6 +3,14 @@
 
   const MEASUREMENT_ID = "G-CSVVQ7F9EZ";
   const CONSENT_KEY = "ndubiz-analytics-consent";
+  const campaign = new URLSearchParams(location.search);
+  let testTraffic = campaign.get('utm_source') === 'codex_test';
+  // Keep a labelled test journey labelled after following internal links.
+  try {
+    if (testTraffic) sessionStorage.setItem('ndubiz-analytics-test', '1');
+    testTraffic = testTraffic || sessionStorage.getItem('ndubiz-analytics-test') === '1';
+  } catch (_) {}
+  let analyticsAllowed = false;
 
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
@@ -16,6 +24,7 @@
 
   function startAnalytics() {
     if (document.querySelector('script[data-ndubiz-ga4]')) return;
+    analyticsAllowed = true;
     window.gtag("consent", "update", { analytics_storage: "granted" });
     const script = document.createElement("script");
     script.async = true;
@@ -23,7 +32,7 @@
     script.src = "https://www.googletagmanager.com/gtag/js?id=" + MEASUREMENT_ID;
     document.head.appendChild(script);
     window.gtag("js", new Date());
-    window.gtag("config", MEASUREMENT_ID, { send_page_view: true });
+    window.gtag("config", MEASUREMENT_ID, { send_page_view: true, ...(testTraffic ? {debug_mode:true, traffic_type:'internal'} : {}) });
   }
 
   function saveChoice(choice) {
@@ -48,28 +57,59 @@
   }
 
   function isAffiliateLink(link) {
-    const href = link.href || "";
-    const rel = (link.getAttribute("rel") || "").toLowerCase();
-    return link.hasAttribute("data-affiliate") || rel.includes("sponsored") ||
-      /amazon\.(com|de)|amzn\.to|tag=gearhub-20|tag=aigearhub2103-21|ref=jouwifmu/i.test(href);
+    const rel = (link.getAttribute("rel") || "").toLowerCase().split(/\s+/);
+    if (link.hasAttribute("data-affiliate") || rel.includes("sponsored")) return true;
+    let url;
+    try { url = new URL(link.href, location.href); } catch (_) { return false; }
+    const host = url.hostname.toLowerCase();
+    const isAmazon = /(^|\.)amazon\.(com|de)$/.test(host);
+    // Retailer reference links without an affiliate tag are ordinary outbound clicks.
+    return (isAmazon && Boolean(url.searchParams.get("tag"))) ||
+      host === "amzn.to" || host === "tidd.ly" ||
+      host === "awin1.com" || host.endsWith(".awin1.com") ||
+      ((host === "switch-bot.com" || host.endsWith(".switch-bot.com")) &&
+        Boolean(url.searchParams.get("sca_ref"))) ||
+      url.searchParams.get("ref") === "jouwifmu";
   }
 
   document.addEventListener("click", function (event) {
     const link = event.target.closest && event.target.closest("a[href]");
-    if (!link || !isAffiliateLink(link) || typeof window.gtag !== "function") return;
-    window.gtag("event", "affiliate_click", {
-      product_name: (link.dataset.product || link.textContent || "Affiliate product").replace(/\s+/g, " ").trim().slice(0, 120),
+    if (!link || typeof window.gtag !== "function") return;
+    let destination;
+    try { destination = new URL(link.href, location.href); } catch (_) { return; }
+    if (!/^https?:$/.test(destination.protocol)) return;
+    const internal = destination.origin === location.origin;
+    const reviewClick = internal && /-review(?:\.html)?$/.test(destination.pathname) && destination.pathname !== location.pathname;
+    if (internal && !reviewClick) return;
+    const eventName = reviewClick ? "review_click" : (isAffiliateLink(link) ? "affiliate_click" : "outbound_click");
+    // Do not queue pre-consent clicks and send them later after acceptance.
+    if (!analyticsAllowed) return;
+    const card = link.closest('article, section, .card, [data-product]');
+    const cardHeading = card && card.querySelector('h3, h2');
+    const heading = document.querySelector('h1');
+    const productName = link.dataset.product || (cardHeading && cardHeading.textContent) || (heading && heading.textContent) || link.textContent || 'External link';
+    window.gtag("event", eventName, {
+      product_name: productName.replace(/\s+/g, " ").trim().slice(0, 120),
       link_url: link.href,
       link_domain: new URL(link.href, location.href).hostname,
       page_path: location.pathname,
+      ...(testTraffic ? {debug_mode:true, traffic_type:'internal'} : {}),
+      ...(link.dataset.ctaPosition ? {cta_position:link.dataset.ctaPosition} : {}),
+      campaign_source: link.dataset.campaignSource || campaign.get("utm_source") || undefined,
+      campaign_medium: link.dataset.campaignMedium || campaign.get("utm_medium") || undefined,
+      campaign_name: link.dataset.campaignName || campaign.get("utm_campaign") || undefined,
+      campaign_content: campaign.get("utm_content") || undefined,
       transport_type: "beacon"
     });
   }, true);
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function initializeAnalytics() {
     let choice = null;
     try { choice = localStorage.getItem(CONSENT_KEY); } catch (_) {}
     if (choice === "accept") startAnalytics();
     else if (choice !== "decline") showConsentChoice();
-  });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initializeAnalytics, { once: true });
+  else initializeAnalytics();
 })();
+
