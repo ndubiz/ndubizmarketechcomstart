@@ -85,7 +85,7 @@
     // Do not queue pre-consent clicks and send them later after acceptance.
     if (!analyticsAllowed) return;
     const card = link.closest('article, section, .card, [data-product]');
-    const cardHeading = card && card.querySelector('h3, h2');
+    const cardHeading = card && card.querySelector('h1, h3, h2');
     const heading = document.querySelector('h1');
     const productName = link.dataset.product || (cardHeading && cardHeading.textContent) || (heading && heading.textContent) || link.textContent || 'External link';
     window.gtag("event", eventName, {
